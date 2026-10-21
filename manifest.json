@@ -1,20 +1,27 @@
 {
-  "manifest_version": 3,
+  "manifest_version": 2,
   "name": "Spam Sweeper",
-  "version": "1.0",
-  "description": "Scans the current folder for explosive throwaway spam and bulk deletes it.",
-  "permissions": [
-    "messagesRead",
-    "messagesMove",
-    "accountsRead"
-  ],
-  "background": {
-    "service_worker": "background.js",
-    "scripts": ["background.js"],
-    "type": "module"
+  "version": "1.1.0",
+  "description": "Group the current folder by sender, mark mail read, delete it, and manage the mailSweeperSpam filter.",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "mailsweeper@local.invalid",
+      "strict_min_version": "128.0"
+    }
   },
-  "action": {
-    "default_title": "Sweep High-Volume Senders",
+  "permissions": ["accountsRead", "messagesRead", "messagesUpdate", "messagesDelete"],
+  "browser_action": {
+    "default_title": "Mail Sweeper",
     "default_popup": "popup.html"
+  },
+  "experiment_apis": {
+    "spamFilter": {
+      "schema": "experiments/spamFilter/schema.json",
+      "parent": {
+        "scopes": ["addon_parent"],
+        "paths": [["spamFilter"]],
+        "script": "experiments/spamFilter/api.js"
+      }
+    }
   }
 }
