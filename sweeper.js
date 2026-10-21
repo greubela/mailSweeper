@@ -21,11 +21,17 @@ var Sweeper = (() => {
       for (const message of page.messages) {
         const email = emailAddress(message.author);
         if (!email) { skipped++; continue; }
-        if (!senders.has(email)) senders.set(email, { email, ids: [], recentCount: 0, filtered: false });
+        if (!senders.has(email)) senders.set(email, {
+          email, ids: [], recentCount: 0, unreadIds: new Set(), recentUnreadIds: new Set(), filtered: false
+        });
         const sender = senders.get(email);
         sender.ids.push(message.id);
         const date = message.date == null ? NaN : new Date(message.date).getTime();
         if (date >= cutoff && date <= now) sender.recentCount++;
+        if (message.read === false) {
+          sender.unreadIds.add(message.id);
+          if (date >= cutoff && date <= now) sender.recentUnreadIds.add(message.id);
+        }
       }
       if (!page.id) break;
       page = await api.messages.continueList(page.id);
@@ -34,28 +40,81 @@ var Sweeper = (() => {
       b.ids.length - a.ids.length || a.email.localeCompare(b.email)) };
   }
 
-  function visibleSenders(senders, minTotal = 50, minRecent = 10) {
+  function visibleSenders(senders, minTotal = 50, minRecent = 10, unreadOnly = false) {
     if (![minTotal, minRecent].every(value => Number.isSafeInteger(value) && value >= 1)) {
       throw new Error("Enter a whole number of at least 1 for each minimum.");
     }
-    return senders.filter(sender => sender.ids.length > 0 &&
-      (sender.ids.length >= minTotal || sender.recentCount >= minRecent));
+    return senders.filter(sender => sender.ids.length > 0 && (unreadOnly
+      ? sender.unreadIds.size >= minTotal || sender.recentUnreadIds.size >= minRecent
+      : sender.ids.length >= minTotal || sender.recentCount >= minRecent));
+  }
+
+  function groupSenders(senders, byDomain = false) {
+    if (!byDomain) return senders;
+    const groups = new Map();
+    for (const sender of senders) {
+      if (!sender.ids.length) continue;
+      const email = `*@${sender.email.split("@")[1]}`;
+      if (!groups.has(email)) groups.set(email, {
+        email, byDomain: true, ids: [], recentCount: 0, unreadIds: new Set(), recentUnreadIds: new Set(), members: []
+      });
+      const group = groups.get(email);
+      for (const id of sender.ids) group.ids.push(id);
+      group.recentCount += sender.recentCount;
+      for (const id of sender.unreadIds || []) group.unreadIds.add(id);
+      for (const id of sender.recentUnreadIds || []) group.recentUnreadIds.add(id);
+      group.members.push(sender);
+    }
+    for (const group of groups.values()) {
+      group.filtered = group.members.every(sender => sender.domainFiltered);
+    }
+    return [...groups.values()].sort((a, b) =>
+      b.ids.length - a.ids.length || a.email.localeCompare(b.email));
   }
 
   async function act(api, action, sender, folder) {
     if (action === "spam") {
-      await api.spamFilter.addSender(folder.accountId, sender.email);
+      if (sender.byDomain) {
+        await api.spamFilter.addSender(folder.accountId, sender.email, true);
+        for (const member of sender.members) {
+          member.domainFiltered = true;
+          member.filtered = true;
+        }
+      } else {
+        await api.spamFilter.addSender(folder.accountId, sender.email);
+      }
       sender.filtered = true;
       return;
     }
     if (!["read", "delete"].includes(action)) throw new Error("Unknown action");
     // Finish every read update before issuing any deletion. Stop on failure.
-    for (const id of sender.ids) await api.messages.update(id, { read: true });
+    const markedRead = new Set();
+    try {
+      for (const id of sender.ids) {
+        await api.messages.update(id, { read: true });
+        markedRead.add(id);
+      }
+    } finally {
+      // Keep cached unread counts accurate, including when an update partly fails.
+      for (const member of [sender, ...(sender.members || [])]) {
+        for (const id of member.unreadIds || []) {
+          if (markedRead.has(id)) {
+            member.unreadIds.delete(id);
+            member.recentUnreadIds.delete(id);
+          }
+        }
+      }
+    }
     if (action === "delete" && sender.ids.length) {
       await api.messages.delete(sender.ids, false);
       sender.ids = [];
+      sender.recentCount = 0;
+      for (const member of sender.members || []) {
+        member.ids = [];
+        member.recentCount = 0;
+      }
     }
   }
-  return { emailAddress, scan, visibleSenders, act };
+  return { emailAddress, scan, visibleSenders, groupSenders, act };
 })();
 if (typeof module !== "undefined") module.exports = Sweeper;

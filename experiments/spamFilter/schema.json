@@ -6,10 +6,11 @@
         "name": "addSender",
         "type": "function",
         "async": true,
-        "description": "Add an exact sender match to the account's mailSweeperSpam filter.",
+        "description": "Add an individual sender or exact sender domain to the account's mailSweeperSpam filter.",
         "parameters": [
           { "name": "accountId", "type": "string" },
-          { "name": "email", "type": "string" }
+          { "name": "email", "type": "string" },
+          { "name": "byDomain", "type": "boolean", "optional": true, "default": false }
         ]
       }
     ]

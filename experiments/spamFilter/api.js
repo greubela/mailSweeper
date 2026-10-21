@@ -5,11 +5,16 @@ var spamFilter = class extends ExtensionCommon.ExtensionAPI {
   getAPI() {
     return {
       spamFilter: {
-        async addSender(accountId, email) {
+        async addSender(accountId, email, byDomain = false) {
           email = email.trim().toLowerCase();
-          if (!/^[^\s<>@,;]+@[^\s<>@,;]+$/.test(email)) {
+          const validDomain = domain => /^[^\s<>@,;*.]+(?:\.[^\s<>@,;*.]+)*$/.test(domain);
+          if (byDomain ? !email.startsWith("*@") || !validDomain(email.slice(2))
+            : !/^[^\s<>@,;]+@[^\s<>@,;]+$/.test(email)) {
             throw new Error("A valid single sender address is required");
           }
+          // Include @ so web.de cannot also match otherweb.de or sub.web.de.
+          const matchValue = byDomain ? email.slice(1) : email;
+          const operator = byDomain ? Ci.nsMsgSearchOp.EndsWith : Ci.nsMsgSearchOp.Is;
           const account = MailServices.accounts.getAccount(accountId);
           if (!account || !account.incomingServer.canHaveFilters) {
             throw new Error("This account does not support message filters");
@@ -21,22 +26,24 @@ var spamFilter = class extends ExtensionCommon.ExtensionAPI {
           // Refuse to broaden a same-named filter with unrelated or grouped rules.
           if (old && (old.unparseable || !terms.length || terms.some(term =>
             term.attrib !== Ci.nsMsgSearchAttrib.Sender ||
-            term.op !== Ci.nsMsgSearchOp.Is || term.booleanAnd ||
+            !(term.op === Ci.nsMsgSearchOp.Is ||
+              (term.op === Ci.nsMsgSearchOp.EndsWith && term.value.str.startsWith("@") &&
+                validDomain(term.value.str.slice(1)))) || term.booleanAnd ||
             term.matchAll || term.beginsGrouping || term.endsGrouping))) {
             throw new Error("Existing mailSweeperSpam has custom conditions. Use Thunderbird’s Message Filters to resolve them first");
           }
           const filter = list.createFilter(name);
           filter.enabled = true;
           filter.filterType = Ci.nsMsgFilterType.InboxRule | Ci.nsMsgFilterType.Manual;
-          filter.filterDesc = "Mail Sweeper: exact sender matches; mark read, then delete.";
+          filter.filterDesc = "Mail Sweeper: sender addresses or domains; mark read, then delete.";
           for (const term of terms) filter.appendTerm(term);
-          if (!terms.some(term => term.value.str.toLowerCase() === email)) {
+          if (!terms.some(term => term.op === operator && term.value.str.toLowerCase() === matchValue)) {
             const term = filter.createTerm();
             term.attrib = Ci.nsMsgSearchAttrib.Sender;
-            term.op = Ci.nsMsgSearchOp.Is;
+            term.op = operator;
             term.booleanAnd = false; // Match ANY of the listed addresses.
             const value = term.value;
-            value.str = email;
+            value.str = matchValue;
             term.value = value;
             filter.appendTerm(term);
           }
