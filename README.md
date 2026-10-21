@@ -9,13 +9,26 @@ refresh them. Missing or invalid message dates count toward the total only.
 Actions still apply to all messages from a qualifying sender in the scanned folder,
 including older messages when the sender qualifies through the recent-message minimum.
 
+**Group by domain** is unchecked by default, so each address has its own row.
+Check it to combine all addresses at the same domain into a row such as `*@web.de`.
+Both thresholds use the combined counts, and read/delete actions affect all messages
+in that domain group. Switching modes regroups the last scan immediately.
+Domains are exact: `web.de`, `sub.web.de`, and `otherweb.de` remain separate.
+
+**Count only unread mail** is also unchecked by default. Enable it to apply both
+minimums to unread messages only, including the unread count within the last 72
+hours. This works for individual addresses and combined domains. The table shows
+unread counts in this mode. Read/delete actions still apply to all mail in the row;
+after marking mail read, its unread counts update immediately.
+
 Each table row offers:
 
 - **Set to read:** mark that sender's messages in the scanned folder as read.
 - **Delete:** finish marking those messages read, then delete them using the account's deletion settings.
-- **Add to spam filter:** add the exact address to `mailSweeperSpam` on the scanned folder's account. This does not process existing mail. The enabled native filter runs on incoming mail and is also available for manual execution in Thunderbird's Message Filters dialog.
+- **Add to spam filter:** add the address, or the whole domain when grouping is enabled, to `mailSweeperSpam` on the scanned folder's account. This does not process existing mail. The enabled native filter runs on incoming mail and is also available for manual execution in Thunderbird's Message Filters dialog.
 
-The filter matches ANY of its addresses and has Mark Read followed by Delete actions.
+The filter matches ANY of its addresses or domains and has Mark Read followed by Delete actions.
+Domain rules use Thunderbird's sender “ends with” condition, e.g. `@web.de`.
 Adding the same address twice does not duplicate it. An existing filter with custom
 conditions is left alone and reported as an error. The native filter persists if
 the extension is uninstalled; manage or remove it in Thunderbird's Message Filters.
@@ -46,7 +59,7 @@ a missing background.js. These issues are corrected.
 
 The only test setup is Node's built-in test runner; no packages need installing.
 Run `node --test tests/sweeper.test.cjs` for mocked API regression tests, including
-pagination, sender grouping, action order, failure handling, filter OR conditions,
+pagination, address/domain grouping, action order, failure handling, filter OR conditions,
 duplicate prevention, and rollback when saving fails.
 
 Tests use synthetic messages and do not access real accounts. For a manual check

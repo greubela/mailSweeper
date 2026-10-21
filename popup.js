@@ -5,6 +5,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const folderName = document.getElementById("folderName");
   const minTotal = document.getElementById("minTotal");
   const minRecent = document.getElementById("minRecent");
+  const groupByDomain = document.getElementById("groupByDomain");
+  const unreadOnly = document.getElementById("unreadOnly");
   let result;
   let busy = false;
 
@@ -12,6 +14,8 @@ document.addEventListener("DOMContentLoaded", () => {
     busy = value;
     minTotal.disabled = value;
     minRecent.disabled = value;
+    groupByDomain.disabled = value;
+    unreadOnly.disabled = value;
     for (const button of document.querySelectorAll("button")) {
       button.disabled = value || button.dataset.done === "true";
     }
@@ -19,15 +23,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function render() {
     list.replaceChildren();
-    const senders = Sweeper.visibleSenders(result.senders, minTotal.valueAsNumber, minRecent.valueAsNumber);
-    status.textContent = `Showing ${senders.length} of ${result.senders.length} sender addresses.${result.skipped ? ` Skipped ${result.skipped} messages without a usable sender address.` : ""}`;
+    const groups = Sweeper.groupSenders(result.senders, groupByDomain.checked);
+    const senders = Sweeper.visibleSenders(groups, minTotal.valueAsNumber, minRecent.valueAsNumber, unreadOnly.checked);
+    status.textContent = `Showing ${senders.length} of ${groups.length} ${groupByDomain.checked ? "domains" : "sender addresses"}.${result.skipped ? ` Skipped ${result.skipped} messages without a usable sender address.` : ""}`;
     if (!senders.length) {
       list.textContent = "No senders meet either minimum in this folder.";
       return;
     }
     const table = document.createElement("table");
     const head = table.createTHead().insertRow();
-    for (const label of ["Nr of mails", "Mail address", "Set to read", "Delete", "Add to spam filter"]) {
+    for (const label of [unreadOnly.checked ? "Unread mails" : "Nr of mails", groupByDomain.checked ? "Sender domain" : "Mail address", "Set to read", "Delete", "Add to spam filter"]) {
       const th = document.createElement("th");
       th.scope = "col";
       th.textContent = label;
@@ -36,7 +41,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const body = table.createTBody();
     for (const sender of senders) {
       const row = body.insertRow();
-      row.insertCell().textContent = sender.ids.length;
+      row.insertCell().textContent = unreadOnly.checked ? sender.unreadIds.size : sender.ids.length;
       row.insertCell().textContent = sender.email;
       for (const [action, label] of [["read", "Set to read"], ["delete", "Delete"], ["spam", "Add to spam filter"]]) {
         const button = document.createElement("button");
@@ -59,6 +64,7 @@ document.addEventListener("DOMContentLoaded", () => {
               : action === "delete" ? `Marked read and deleted ${count} messages from ${sender.email}.`
               : `Marked ${count} messages from ${sender.email} as read.`;
           } catch (error) {
+            render();
             status.textContent = `${label} failed: ${error.message}. Some messages may already have changed; scan again to refresh.`;
           } finally {
             setBusy(false);
@@ -70,7 +76,7 @@ document.addEventListener("DOMContentLoaded", () => {
     list.append(table);
   }
 
-  for (const input of [minTotal, minRecent]) {
+  for (const input of [minTotal, minRecent, groupByDomain, unreadOnly]) {
     input.addEventListener("input", () => {
       if (busy || !result) return;
       try {

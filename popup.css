@@ -14,6 +14,9 @@ header { display: flex; align-items: center; justify-content: space-between; gap
 h1 { font-size: 20px; margin: 0; }
 #folderName { overflow-wrap: anywhere; margin: 12px 0; }
 #folderName:empty { display: none; }
+.options { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 12px; }
+.grouping { display: flex; align-items: center; gap: 7px; font-size: 12px; }
+.grouping input { margin: 0; }
 .thresholds { display: flex; align-items: end; gap: 12px; margin-top: 16px; }
 .thresholds label { display: flex; flex: 1; flex-direction: column; gap: 6px; font-size: 12px; }
 .thresholds input { width: 100%; padding: 7px; font: inherit; border: 1px solid #8888; border-radius: 4px; }

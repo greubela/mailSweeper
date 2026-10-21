@@ -64,7 +64,7 @@ test('read and filter buttons do not delete existing mail', async () => {
 });
 
 function filterHarness() {
-  const Ci = { nsMsgSearchAttrib: { Sender: 1 }, nsMsgSearchOp: { Is: 2 }, nsMsgFilterType: { InboxRule: 1, Manual: 16 }, nsMsgFilterAction: { MarkRead: 4, Delete: 3 } };
+  const Ci = { nsMsgSearchAttrib: { Sender: 1 }, nsMsgSearchOp: { Is: 2, EndsWith: 3 }, nsMsgFilterType: { InboxRule: 1, Manual: 16 }, nsMsgFilterAction: { MarkRead: 4, Delete: 3 } };
   const filters = [];
   let failSave = false;
   const list = {
@@ -150,4 +150,197 @@ test('default thresholds match total OR recent minimum inclusively, retaining al
     assert.throws(() => Sweeper.visibleSenders(senders, value, 10), /whole number/);
     assert.throws(() => Sweeper.visibleSenders(senders, 50, value), /whole number/);
   }
+});
+
+test('domain grouping combines total and recent counts before filtering and keeps exact domains separate', () => {
+  const senders = [
+    { email: 'alice@web.de', ids: Array.from({length: 25}, (_, i) => i + 1), recentCount: 5 },
+    { email: 'bob@web.de', ids: Array.from({length: 25}, (_, i) => i + 26), recentCount: 5 },
+    { email: 'other@otherweb.de', ids: [51], recentCount: 1 },
+    { email: 'sub@sub.web.de', ids: [52], recentCount: 1 }
+  ];
+  assert.equal(Sweeper.groupSenders(senders), senders);
+  assert.equal(Sweeper.visibleSenders(senders).length, 0);
+  const groups = Sweeper.groupSenders(senders, true);
+  assert.deepEqual(groups.map(g => g.email), ['*@web.de', '*@otherweb.de', '*@sub.web.de']);
+  assert.equal(groups[0].recentCount, 10);
+  assert.deepEqual(groups[0].ids, Array.from({length: 50}, (_, i) => i + 1));
+  assert.deepEqual(Sweeper.visibleSenders(groups).map(g => g.email), ['*@web.de']);
+  assert.deepEqual(Sweeper.visibleSenders(groups, 51, 10).map(g => g.email), ['*@web.de']);
+  assert.equal(Sweeper.visibleSenders(groups, 51, 11).length, 0);
+});
+
+test('domain deletion marks every member read, deletes only that domain and stays deleted after toggling modes', async () => {
+  const senders = [
+    { email: 'a@web.de', ids: [1], recentCount: 1 },
+    { email: 'b@web.de', ids: [2], recentCount: 1 },
+    { email: 'c@otherweb.de', ids: [3], recentCount: 1 }
+  ];
+  const calls = [];
+  const api = { messages: {
+    update: async (...args) => calls.push(['update', ...args]),
+    delete: async (...args) => calls.push(['delete', ...args])
+  } };
+  await Sweeper.act(api, 'delete', Sweeper.groupSenders(senders, true)[0], {});
+  assert.deepEqual(calls, [['update', 1, {read:true}], ['update', 2, {read:true}], ['delete', [1, 2], false]]);
+  assert.deepEqual(Sweeper.visibleSenders(senders, 1, 1).map(s => s.email), ['c@otherweb.de']);
+  assert.deepEqual(Sweeper.groupSenders(senders, true).map(s => s.email), ['*@otherweb.de']);
+});
+
+test('individual deletion updates domain counts; domain read failures prevent deletion and preserve members', async () => {
+  const senders = [
+    { email: 'a@web.de', ids: [1], recentCount: 1 },
+    { email: 'b@web.de', ids: [2, 3], recentCount: 2 }
+  ];
+  const api = { messages: { update: async () => {}, delete: async () => {} } };
+  await Sweeper.act(api, 'delete', senders[0], {});
+  let group = Sweeper.groupSenders(senders, true)[0];
+  assert.deepEqual(group.ids, [2, 3]);
+  assert.equal(group.recentCount, 2);
+  api.messages.update = async id => { if (id === 3) throw Error('read failed'); };
+  api.messages.delete = async () => assert.fail('must not delete');
+  await assert.rejects(Sweeper.act(api, 'delete', group, {}), /read failed/);
+  group = Sweeper.groupSenders(senders, true)[0];
+  assert.deepEqual(group.ids, [2, 3]);
+  assert.equal(group.recentCount, 2);
+});
+
+test('domain spam action persists across toggles without claiming an individual rule blocks its entire domain', async () => {
+  const senders = [
+    { email: 'a@web.de', ids: [1], recentCount: 1 },
+    { email: 'b@web.de', ids: [2], recentCount: 1 }
+  ];
+  const calls = [];
+  const api = { spamFilter: { addSender: async (...args) => calls.push(args) } };
+  await Sweeper.act(api, 'spam', senders[0], {accountId:'account1'});
+  assert.equal(Sweeper.groupSenders(senders, true)[0].filtered, false);
+  await Sweeper.act(api, 'spam', Sweeper.groupSenders(senders, true)[0], {accountId:'account1'});
+  assert.deepEqual(calls, [['account1', 'a@web.de'], ['account1', '*@web.de', true]]);
+  assert.equal(Sweeper.groupSenders(senders, true)[0].filtered, true);
+  assert.ok(senders.every(s => s.filtered));
+});
+
+test('native filter mixes exact addresses and domain suffixes, preserving rules without duplicates', async () => {
+  const h = filterHarness();
+  await h.add('account1', 'a@example.test');
+  await h.add('account1', '*@WEB.DE', true);
+  await h.add('account1', '*@web.de', true);
+  await h.add('account1', 'b@example.test');
+  const f = h.filters[0];
+  assert.deepEqual(Array.from(f.searchTerms, t => [t.op, t.value.str]), [
+    [2, 'a@example.test'], [3, '@web.de'], [2, 'b@example.test']
+  ]);
+  assert.ok(f.searchTerms.every(t => !t.booleanAnd && t.attrib === 1));
+  assert.deepEqual(Array.from(f.actions, a => a.type), [4, 3]);
+  for (const target of ['web.de', '*@', '*@web.de,other.de', '*@*.web.de', '*@web.de\nother']) {
+    await assert.rejects(h.add('account1', target, true), /valid/);
+  }
+});
+
+test('native domain filter rejects unrelated suffix rules and rolls back failed saves', async () => {
+  const h = filterHarness();
+  await h.add('account1', '*@web.de', true);
+  const old = h.filters[0];
+  h.failSave();
+  await assert.rejects(h.add('account1', '*@example.test', true), /disk full/);
+  assert.equal(h.filters[0], old);
+  old.searchTerms[0].value.str = 'de';
+  await assert.rejects(h.add('account1', '*@example.test', true), /custom conditions/);
+  assert.equal(h.filters[0], old);
+});
+
+test('unread thresholds use only unread messages, combining recent unread counts by domain', async () => {
+  const now = Date.parse('2026-10-21T12:00:00Z');
+  const recent = new Date(now - 3600000);
+  const old = new Date(now - 73 * 3600000);
+  let id = 0;
+  const messages = [];
+  const add = (author, count, read, date) => {
+    for (let i = 0; i < count; i++) messages.push({id:++id, author, read, date});
+  };
+  add('readheavy@example.test', 100, true, recent);
+  add('readheavy@example.test', 9, false, recent);
+  add('oldunread@example.test', 50, false, old);
+  add('a@web.de', 5, false, recent);
+  add('b@web.de', 5, false, recent);
+  add('b@web.de', 40, true, recent);
+  const result = await Sweeper.scan({
+    mailTabs: {query:async () => [{displayedFolder:{id:'f'}}]},
+    messages: {list:async () => ({messages})}
+  }, now);
+  assert.deepEqual(Sweeper.visibleSenders(result.senders, 50, 10, true).map(s => s.email), ['oldunread@example.test']);
+  assert.equal(Sweeper.visibleSenders(result.senders).length, 3);
+  const groups = Sweeper.groupSenders(result.senders, true);
+  assert.deepEqual(Sweeper.visibleSenders(groups, 50, 10, true).map(s => s.email), ['*@example.test', '*@web.de']);
+  const web = groups.find(g => g.email === '*@web.de');
+  assert.equal(web.ids.length, 50);
+  assert.equal(web.unreadIds.size, 10);
+  assert.equal(web.recentUnreadIds.size, 10);
+  assert.deepEqual(Sweeper.visibleSenders(groups, 60, 10, true).map(s => s.email), ['*@web.de']);
+});
+
+test('only unread messages within the inclusive 72-hour window count toward the recent unread minimum', async () => {
+  const now = Date.parse('2026-10-21T12:00:00Z');
+  const cutoff = now - 72 * 3600000;
+  const messages = [
+    {id:1, read:false, date:new Date(cutoff)},
+    {id:2, read:false, date:new Date(cutoff - 1)},
+    {id:3, read:false, date:new Date(now)},
+    {id:4, read:true, date:new Date(now)},
+    {id:5, read:false, date:new Date(now + 1)},
+    {id:6, read:false, date:'invalid'}
+  ].map(m => ({...m, author:'a@web.de'}));
+  const result = await Sweeper.scan({
+    mailTabs: {query:async () => [{displayedFolder:{id:'f'}}]},
+    messages: {
+      list:async () => ({messages:messages.slice(0,3), id:'next'}),
+      continueList:async () => ({messages:messages.slice(3)})
+    }
+  }, now);
+  assert.deepEqual([...result.senders[0].unreadIds], [1,2,3,5,6]);
+  assert.deepEqual([...result.senders[0].recentUnreadIds], [1,3]);
+  assert.equal(Sweeper.visibleSenders(result.senders, 6, 3, true).length, 0);
+  assert.equal(Sweeper.visibleSenders(result.senders, 6, 2, true).length, 1);
+});
+
+function unreadSenders() {
+  return [
+    {email:'a@web.de', ids:[1], recentCount:1, unreadIds:new Set([1]), recentUnreadIds:new Set([1])},
+    {email:'b@web.de', ids:[2], recentCount:1, unreadIds:new Set([2]), recentUnreadIds:new Set([2])}
+  ];
+}
+
+test('marking a domain read clears unread counts in both modes without changing total counts', async () => {
+  const senders = unreadSenders();
+  const calls = [];
+  await Sweeper.act({messages:{update:async id => calls.push(id)}}, 'read', Sweeper.groupSenders(senders, true)[0], {});
+  assert.deepEqual(calls, [1,2]);
+  assert.equal(Sweeper.visibleSenders(senders, 1, 1, true).length, 0);
+  assert.equal(Sweeper.visibleSenders(Sweeper.groupSenders(senders,true), 1, 1, true).length, 0);
+  assert.equal(Sweeper.groupSenders(senders,true)[0].ids.length, 2);
+  assert.equal(Sweeper.groupSenders(senders,true)[0].recentCount, 2);
+});
+
+test('a partial read failure updates only successful unread counts and prevents deletion', async () => {
+  const senders = unreadSenders();
+  await assert.rejects(Sweeper.act({messages:{
+    update:async id => {if (id === 2) throw Error('read failed');},
+    delete:async () => assert.fail('must not delete')
+  }}, 'delete', Sweeper.groupSenders(senders,true)[0], {}), /read failed/);
+  assert.equal(senders[0].unreadIds.size, 0);
+  assert.deepEqual([...senders[1].unreadIds], [2]);
+  const group = Sweeper.groupSenders(senders,true)[0];
+  assert.equal(group.unreadIds.size, 1);
+  assert.equal(group.recentUnreadIds.size, 1);
+  assert.equal(group.ids.length, 2);
+});
+
+test('a failed delete retains messages while reflecting that they were marked read first', async () => {
+  const senders = unreadSenders();
+  await assert.rejects(Sweeper.act({messages:{
+    update:async () => {}, delete:async () => {throw Error('delete failed');}
+  }}, 'delete', senders[0], {}), /delete failed/);
+  assert.deepEqual(senders[0].ids, [1]);
+  assert.equal(senders[0].unreadIds.size, 0);
+  assert.equal(Sweeper.groupSenders(senders,true)[0].unreadIds.size, 1);
 });
