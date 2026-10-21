@@ -1,17 +1,41 @@
-:root { color-scheme: light dark; font-family: system-ui, sans-serif; }
-body { width: 720px; max-width: calc(100vw - 32px); margin: 0; padding: 16px; }
-h1 { font-size: 20px; margin: 0 0 12px; }
-#senderList { max-height: 380px; overflow: auto; margin: 12px 0; }
-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, sans-serif;
+  font-size: 13px;
+  /* Thunderbird sizes the popup from its document. A viewport-relative maximum
+     creates a sizing loop while the popup's initial viewport is still narrow. */
+  width: 760px;
+  background: Canvas;
+  color: CanvasText;
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 16px; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+h1 { font-size: 20px; margin: 0; }
+#folderName { overflow-wrap: anywhere; margin: 12px 0; }
+#folderName:empty { display: none; }
+.thresholds { display: flex; align-items: end; gap: 12px; margin-top: 16px; }
+.thresholds label { display: flex; flex: 1; flex-direction: column; gap: 6px; font-size: 12px; }
+.thresholds input { width: 100%; padding: 7px; font: inherit; border: 1px solid #8888; border-radius: 4px; }
+.alternative { padding-bottom: 8px; }
+#senderList { max-height: 280px; overflow: auto; margin: 12px 0; border: 1px solid #8886; border-radius: 4px; padding: 10px; }
+#senderList:has(table) { padding: 0; }
+table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 12px; }
 th, td { padding: 9px 7px; text-align: left; border-bottom: 1px solid #8886; }
-th { position: sticky; top: 0; background: Canvas; }
+th { position: sticky; top: 0; background: Canvas; vertical-align: bottom; }
+th:nth-child(1) { width: 68px; }
+th:nth-child(3) { width: 98px; }
+th:nth-child(4) { width: 76px; }
+th:nth-child(5) { width: 144px; }
 td:nth-child(2) { overflow-wrap: anywhere; }
-button { padding: 7px 10px; cursor: pointer; border: 1px solid #8888; border-radius: 5px; font: inherit; }
+tr:last-child td { border-bottom: 0; }
+button { padding: 7px 10px; cursor: pointer; border: 1px solid #8888; border-radius: 4px; font: inherit; white-space: nowrap; }
+button:hover:enabled { background: light-dark(#e9edf5, #343a46); }
 button:disabled { cursor: default; opacity: .6; }
-.thresholds { display: flex; align-items: end; gap: 12px; }
-.thresholds label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; }
-.thresholds input { width: 100px; padding: 6px; font: inherit; }
-.alternative { padding-bottom: 6px; font-size: 12px; }
+#scanBtn { background: #2563eb; border-color: #2563eb; color: #fff; }
+#scanBtn:hover:enabled { background: #1d4ed8; }
 .delete { color: light-dark(#b42318, #ffb4ab); }
 .hint, #status, #folderName { font-size: 12px; line-height: 1.5; }
-.hint { opacity: .8; }
+.hint { opacity: .8; margin: 8px 0; }
+#status { margin: 10px 0 0; }
+#status:empty { display: none; }

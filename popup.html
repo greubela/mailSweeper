@@ -6,8 +6,10 @@
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <h1>Mail Sweeper</h1>
-  <button id="scanBtn" type="button">Scan Current Folder</button>
+  <header>
+    <h1>Mail Sweeper</h1>
+    <button id="scanBtn" type="button">Scan Current Folder</button>
+  </header>
   <p id="folderName"></p>
   <div class="thresholds" aria-describedby="thresholdHint">
     <label for="minTotal">Minimum messages (total)
@@ -18,9 +20,9 @@
       <input id="minRecent" type="number" min="1" step="1" value="10" required>
     </label>
   </div>
-  <p id="thresholdHint" class="hint">Show senders meeting either minimum in the scanned folder. Changing a minimum updates the list immediately.</p>
+  <p id="thresholdHint" class="hint">Show senders meeting either minimum in this folder.</p>
   <div id="senderList">Scan a folder to see its senders.</div>
-  <p class="hint">Actions affect this scanned folder. Delete marks messages read first and follows your account’s deletion settings. The spam button adds a rule for future incoming mail on this account; it does not delete existing mail.</p>
+  <p class="hint">Actions apply to all mail from the sender in this folder. Delete marks mail read first.<br>Spam filter applies to future mail on this account.</p>
   <p id="status" role="status" aria-live="polite"></p>
   <script src="sweeper.js"></script>
   <script src="popup.js"></script>

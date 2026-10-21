@@ -1,4 +1,4 @@
-# Mail Sweeper 1.1
+# Mail Sweeper
 
 Thunderbird 128 or later. Scan the folder displayed in the active mail tab to see
 senders sorted by message count. Two number spinners above the table control visibility:
@@ -27,8 +27,10 @@ are skipped and counted in the status.
 
 ## Installation
 
-Install `mailSweeper-1.1.0.xpi` using Thunderbird's Add-ons Manager gear menu →
-Install Add-on From File. The extension uses a privileged Thunderbird Experiment
+Zip `manifest.json`, `popup.html`, `popup.css`, `popup.js`, `sweeper.js`, and the
+`experiments/` directory at the archive root, then rename the archive to `.xpi`.
+Install it using Thunderbird's Add-ons Manager gear menu → Install Add-on From File.
+The extension uses a privileged Thunderbird Experiment
 API to edit native message filters, so Thunderbird requests full access. Manifest
 V2 is used for this implementation; no background worker is needed.
 
@@ -42,11 +44,14 @@ a missing background.js. These issues are corrected.
 
 ## Validation
 
+The only test setup is Node's built-in test runner; no packages need installing.
 Run `node --test tests/sweeper.test.cjs` for mocked API regression tests, including
 pagination, sender grouping, action order, failure handling, filter OR conditions,
 duplicate prevention, and rollback when saving fails.
 
-Run `python tests/ui-smoke.py` with Playwright and Chromium at `/usr/bin/chromium`
-for the browser UI check. Both test suites use synthetic messages and do not access
-real accounts. Native Thunderbird integration could not be tested in this workspace;
-verify filter behavior with a test account before relying on automatic filtering.
+Tests use synthetic messages and do not access real accounts. For a manual check
+in Thunderbird, open the toolbar popup, scan a test folder, adjust both minimums,
+and try each sender action. Check `mailSweeperSpam` in Message Filters.
+
+The popup has an explicit 760px document width so Thunderbird can size it before
+its viewport is established. Long sender lists scroll inside the table.
