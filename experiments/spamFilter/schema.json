@@ -1,0 +1,17 @@
+[
+  {
+    "namespace": "spamFilter",
+    "functions": [
+      {
+        "name": "addSender",
+        "type": "function",
+        "async": true,
+        "description": "Add an exact sender match to the account's mailSweeperSpam filter.",
+        "parameters": [
+          { "name": "accountId", "type": "string" },
+          { "name": "email", "type": "string" }
+        ]
+      }
+    ]
+  }
+]

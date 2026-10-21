@@ -1,0 +1,17 @@
+:root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+body { width: 720px; max-width: calc(100vw - 32px); margin: 0; padding: 16px; }
+h1 { font-size: 20px; margin: 0 0 12px; }
+#senderList { max-height: 380px; overflow: auto; margin: 12px 0; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { padding: 9px 7px; text-align: left; border-bottom: 1px solid #8886; }
+th { position: sticky; top: 0; background: Canvas; }
+td:nth-child(2) { overflow-wrap: anywhere; }
+button { padding: 7px 10px; cursor: pointer; border: 1px solid #8888; border-radius: 5px; font: inherit; }
+button:disabled { cursor: default; opacity: .6; }
+.thresholds { display: flex; align-items: end; gap: 12px; }
+.thresholds label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; }
+.thresholds input { width: 100px; padding: 6px; font: inherit; }
+.alternative { padding-bottom: 6px; font-size: 12px; }
+.delete { color: light-dark(#b42318, #ffb4ab); }
+.hint, #status, #folderName { font-size: 12px; line-height: 1.5; }
+.hint { opacity: .8; }
