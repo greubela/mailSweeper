@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Spam Sweeper",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Group the current folder by sender, mark mail read, delete it, and manage the mailSweeperSpam filter.",
   "browser_specific_settings": {
     "gecko": {
