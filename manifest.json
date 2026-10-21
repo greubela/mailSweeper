@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "Spam Sweeper",
+  "version": "1.0",
+  "description": "Scans the current folder for explosive throwaway spam and bulk deletes it.",
+  "permissions": [
+    "messagesRead",
+    "messagesMove",
+    "accountsRead"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "scripts": ["background.js"],
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Sweep High-Volume Senders",
+    "default_popup": "popup.html"
+  }
+}
