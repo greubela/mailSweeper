@@ -6,6 +6,10 @@ at least 50 total messages OR at least 10 messages dated within the last 72 hour
 by default. Both minimums accept positive whole numbers and update the list immediately
 without rescanning. Counts and the 72-hour window reflect the last scan; rescan to
 refresh them. Missing or invalid message dates count toward the total only.
+The scan includes only the selected folder, excluding subfolders. The summary shows
+messages scanned, unread messages at scan time, groups hidden by the filters, and
+messages skipped because their sender is missing or ambiguous. **Show all senders**
+sets both minimums to 1 and turns off unread-only counting, preserving domain grouping.
 Actions still apply to all messages from a qualifying sender in the scanned folder,
 including older messages when the sender qualifies through the recent-message minimum.
 
@@ -36,7 +40,9 @@ the extension is uninstalled; manage or remove it in Thunderbird's Message Filte
 Keep the popup open while an action runs. Rescan after an error or external mail
 changes. Actions use the IDs captured by the scan, so they apply to that folder
 even if the active tab changes afterward. Messages with unusable sender addresses
-are skipped and counted in the status.
+are skipped and counted in the summary. Thunderbird's mailbox parser is used for
+sender formats with comments; quoted local parts are also supported. A message
+with multiple From addresses is counted as skipped rather than assigned arbitrarily.
 
 ## Installation
 
@@ -66,5 +72,6 @@ Tests use synthetic messages and do not access real accounts. For a manual check
 in Thunderbird, open the toolbar popup, scan a test folder, adjust both minimums,
 and try each sender action. Check `mailSweeperSpam` in Message Filters.
 
-The popup has an explicit 760px document width so Thunderbird can size it before
-its viewport is established. Long sender lists scroll inside the table.
+The popup establishes a 760 × 580px size on both the document and body before the
+external stylesheet loads. The table fills the remaining space and scrolls inside
+the popup; it does not depend on Thunderbird resizing the panel after a scan.

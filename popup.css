@@ -2,14 +2,12 @@
   color-scheme: light dark;
   font-family: system-ui, sans-serif;
   font-size: 13px;
-  /* Thunderbird sizes the popup from its document. A viewport-relative maximum
-     creates a sizing loop while the popup's initial viewport is still narrow. */
-  width: 760px;
   background: Canvas;
   color: CanvasText;
 }
 * { box-sizing: border-box; }
-body { margin: 0; padding: 16px; }
+body { padding: 16px; display: flex; flex-direction: column; overflow: auto; }
+body > :not(#senderList) { flex-shrink: 0; }
 header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 h1 { font-size: 20px; margin: 0; }
 #folderName { overflow-wrap: anywhere; margin: 12px 0; }
@@ -21,7 +19,7 @@ h1 { font-size: 20px; margin: 0; }
 .thresholds label { display: flex; flex: 1; flex-direction: column; gap: 6px; font-size: 12px; }
 .thresholds input { width: 100%; padding: 7px; font: inherit; border: 1px solid #8888; border-radius: 4px; }
 .alternative { padding-bottom: 8px; }
-#senderList { max-height: 280px; overflow: auto; margin: 12px 0; border: 1px solid #8886; border-radius: 4px; padding: 10px; }
+#senderList { flex: 1; min-height: 100px; overflow: auto; margin: 12px 0; border: 1px solid #8886; border-radius: 4px; padding: 10px; }
 #senderList:has(table) { padding: 0; }
 table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 12px; }
 th, td { padding: 9px 7px; text-align: left; border-bottom: 1px solid #8886; }
@@ -42,3 +40,7 @@ button:disabled { cursor: default; opacity: .6; }
 .hint { opacity: .8; margin: 8px 0; }
 #status { margin: 10px 0 0; }
 #status:empty { display: none; }
+.filter-summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; }
+#showAllBtn { font-size: 12px; }
+#scanSummary { margin: 0; }
+#scanSummary:empty { display: none; }

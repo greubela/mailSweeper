@@ -9,7 +9,7 @@ var spamFilter = class extends ExtensionCommon.ExtensionAPI {
           email = email.trim().toLowerCase();
           const validDomain = domain => /^[^\s<>@,;*.]+(?:\.[^\s<>@,;*.]+)*$/.test(domain);
           if (byDomain ? !email.startsWith("*@") || !validDomain(email.slice(2))
-            : !/^[^\s<>@,;]+@[^\s<>@,;]+$/.test(email)) {
+            : !/^(?:"(?:[^"\\\r\n]|\\.)+"|[^\s<>@,;"()]+)@[^\s<>@,;"()]+$/.test(email)) {
             throw new Error("A valid single sender address is required");
           }
           // Include @ so web.de cannot also match otherweb.de or sub.web.de.

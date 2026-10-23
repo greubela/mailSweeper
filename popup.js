@@ -7,6 +7,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const minRecent = document.getElementById("minRecent");
   const groupByDomain = document.getElementById("groupByDomain");
   const unreadOnly = document.getElementById("unreadOnly");
+  const showAllBtn = document.getElementById("showAllBtn");
+  const scanSummary = document.getElementById("scanSummary");
   let result;
   let busy = false;
 
@@ -19,13 +21,15 @@ document.addEventListener("DOMContentLoaded", () => {
     for (const button of document.querySelectorAll("button")) {
       button.disabled = value || button.dataset.done === "true";
     }
+    showAllBtn.disabled = value || !result;
   }
 
   function render() {
     list.replaceChildren();
-    const groups = Sweeper.groupSenders(result.senders, groupByDomain.checked);
+    const groups = Sweeper.groupSenders(result.senders, groupByDomain.checked).filter(sender => sender.ids.length);
     const senders = Sweeper.visibleSenders(groups, minTotal.valueAsNumber, minRecent.valueAsNumber, unreadOnly.checked);
-    status.textContent = `Showing ${senders.length} of ${groups.length} ${groupByDomain.checked ? "domains" : "sender addresses"}.${result.skipped ? ` Skipped ${result.skipped} messages without a usable sender address.` : ""}`;
+    scanSummary.textContent = `Scanned ${result.total} messages (${result.unread} unread at scan time). ${groups.length - senders.length} ${groupByDomain.checked ? "domains" : "addresses"} hidden by the current filters.${result.skipped ? ` ${result.skipped} message${result.skipped === 1 ? "" : "s"} skipped: missing or ambiguous sender address.` : ""}`;
+    status.textContent = `Showing ${senders.length} of ${groups.length} ${groupByDomain.checked ? "domains" : "sender addresses"}.`;
     if (!senders.length) {
       list.textContent = "No senders meet either minimum in this folder.";
       return;
@@ -76,6 +80,14 @@ document.addEventListener("DOMContentLoaded", () => {
     list.append(table);
   }
 
+  showAllBtn.addEventListener("click", () => {
+    if (busy || !result) return;
+    minTotal.value = "1";
+    minRecent.value = "1";
+    unreadOnly.checked = false;
+    render();
+  });
+
   for (const input of [minTotal, minRecent, groupByDomain, unreadOnly]) {
     input.addEventListener("input", () => {
       if (busy || !result) return;
@@ -91,8 +103,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (busy) return;
     setBusy(true);
     result = null;
+    showAllBtn.disabled = true;
     list.replaceChildren();
     folderName.textContent = "";
+    scanSummary.textContent = "";
     status.textContent = "Reading the current folder…";
     try {
       result = await Sweeper.scan(messenger);

@@ -344,3 +344,66 @@ test('a failed delete retains messages while reflecting that they were marked re
   assert.equal(senders[0].unreadIds.size, 0);
   assert.equal(Sweeper.groupSenders(senders,true)[0].unreadIds.size, 1);
 });
+
+test('Thunderbird mailbox parsing recovers comment-formatted authors across pages and reports skipped messages', async () => {
+  const calls = [];
+  const api = {
+    mailTabs: {query:async () => [{displayedFolder:{id:'folder'}}]},
+    messengerUtilities: {parseMailboxString:async author => {
+      calls.push(author);
+      if (author === 'Alice <alice@web.de> (work)') return [{email:'alice@web.de'}];
+      if (author === 'bob@web.de(comment)') return [{email:'bob@web.de'}];
+      return [{email:'one@web.de'}, {email:'two@web.de'}];
+    }},
+    messages: {
+      list:async () => ({messages:[
+        {id:1, author:'Alice <alice@web.de> (work)', read:false},
+        {id:2, author:'bob@web.de(comment)', read:true}
+      ], id:'next'}),
+      continueList:async () => ({messages:[
+        {id:3, author:'Alice <alice@web.de> (work)', read:false},
+        {id:4, author:'one@web.de, two@web.de', read:true},
+        {id:5, read:false}
+      ]})
+    }
+  };
+  const result = await Sweeper.scan(api);
+  assert.equal(result.total, 5);
+  assert.equal(result.unread, 3);
+  assert.equal(result.skipped, 2);
+  assert.deepEqual(result.senders.map(s => [s.email,s.ids]), [
+    ['alice@web.de', [1,3]], ['bob@web.de', [2]]
+  ]);
+  assert.deepEqual(calls, ['Alice <alice@web.de> (work)', 'bob@web.de(comment)', 'one@web.de, two@web.de']);
+});
+
+test('an invalid sender parse does not stop scanning other messages', async () => {
+  const result = await Sweeper.scan({
+    mailTabs: {query:async () => [{displayedFolder:{id:'folder'}}]},
+    messengerUtilities: {parseMailboxString:async () => {throw Error('bad header');}},
+    messages:{list:async () => ({messages:[{id:1,author:'bad header'}, {id:2,author:'a@web.de'}]})}
+  });
+  assert.equal(result.total, 2);
+  assert.equal(result.skipped, 1);
+  assert.deepEqual(result.senders[0].ids, [2]);
+});
+
+test('quoted local parts remain individual addresses and group under the correct domain', async () => {
+  const author = '"Team" <"sales team@office"@web.de>';
+  assert.equal(Sweeper.emailAddress(author), '"sales team@office"@web.de');
+  const result = await Sweeper.scan({
+    mailTabs:{query:async () => [{displayedFolder:{id:'folder'}}]},
+    messages:{list:async () => ({messages:[{id:1,author,read:false}]})}
+  });
+  assert.equal(result.skipped, 0);
+  assert.equal(Sweeper.groupSenders(result.senders,true)[0].email, '*@web.de');
+  const h = filterHarness();
+  await h.add('account1', result.senders[0].email);
+  assert.equal(h.filters[0].searchTerms[0].value.str, '"sales team@office"@web.de');
+});
+
+test('the simple sender parser does not select an arbitrary address from a multi-author header', () => {
+  assert.equal(Sweeper.emailAddress('One <one@web.de>, Two <two@web.de>'), null);
+  assert.equal(Sweeper.emailAddress('one@web.de, Two <two@web.de>'), null);
+  assert.equal(Sweeper.emailAddress('"Doe, Jane" <jane@web.de>'), 'jane@web.de');
+});

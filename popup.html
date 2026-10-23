@@ -3,6 +3,10 @@
 <head>
   <meta charset="utf-8">
   <title>Mail Sweeper</title>
+  <!-- Establish the popup size before the external stylesheet loads. -->
+  <style>
+    html, body { width: 760px; min-width: 760px; height: 580px; min-height: 580px; margin: 0; }
+  </style>
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
@@ -30,9 +34,13 @@
       <input id="minRecent" type="number" min="1" step="1" value="10" required>
     </label>
   </div>
-  <p id="thresholdHint" class="hint">Show addresses or domains meeting either minimum in this folder.</p>
+  <div class="filter-summary">
+    <p id="thresholdHint" class="hint">Show addresses or domains meeting either minimum in this folder.</p>
+    <button id="showAllBtn" type="button" disabled>Show all senders</button>
+  </div>
+  <p id="scanSummary" class="hint" aria-live="polite"></p>
   <div id="senderList">Scan a folder to see its senders.</div>
-  <p class="hint">Actions apply to all mail from the address or domain in this folder. Delete marks mail read first.<br>Spam filter applies to future mail from that address or domain on this account.</p>
+  <p class="hint">Scans this folder only, excluding subfolders. Actions apply to all mail in the row.<br>Delete marks mail read first. Spam filter applies to future mail on this account.</p>
   <p id="status" role="status" aria-live="polite"></p>
   <script src="sweeper.js"></script>
   <script src="popup.js"></script>

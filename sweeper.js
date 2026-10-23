@@ -2,9 +2,9 @@
 var Sweeper = (() => {
   function emailAddress(author) {
     const raw = (author || "").trim();
-    const match = raw.match(/<([^<>]+)>\s*$/);
+    const match = raw.match(/^(?:"(?:[^"\\]|\\.)*"|[^<>,;"]*)\s*<([^<>]+)>\s*$/);
     const email = (match ? match[1] : raw).trim().toLowerCase();
-    return /^[^\s<>@,;]+@[^\s<>@,;]+$/.test(email) ? email : null;
+    return /^(?:"(?:[^"\\\r\n]|\\.)+"|[^\s<>@,;"()]+)@[^\s<>@,;"()]+$/.test(email) ? email : null;
   }
 
   async function scan(api, now = Date.now()) {
@@ -15,11 +15,29 @@ var Sweeper = (() => {
     const folder = tab.displayedFolder;
     const senders = new Map();
     const cutoff = now - 72 * 60 * 60 * 1000;
+    const parsedAuthors = new Map();
+    let total = 0;
+    let unread = 0;
     let skipped = 0;
     let page = await api.messages.list(folder.id);
     while (true) {
       for (const message of page.messages) {
-        const email = emailAddress(message.author);
+        total++;
+        if (message.read === false) unread++;
+        const author = message.author || "";
+        if (!parsedAuthors.has(author)) {
+          let email = emailAddress(author);
+          if (!email && author && api.messengerUtilities?.parseMailboxString) {
+            try {
+              const mailboxes = await api.messengerUtilities.parseMailboxString(author);
+              if (mailboxes.length === 1) email = emailAddress(mailboxes[0].email);
+            } catch {
+              // Invalid/ambiguous headers are included in the skipped count.
+            }
+          }
+          parsedAuthors.set(author, email);
+        }
+        const email = parsedAuthors.get(author);
         if (!email) { skipped++; continue; }
         if (!senders.has(email)) senders.set(email, {
           email, ids: [], recentCount: 0, unreadIds: new Set(), recentUnreadIds: new Set(), filtered: false
@@ -36,7 +54,7 @@ var Sweeper = (() => {
       if (!page.id) break;
       page = await api.messages.continueList(page.id);
     }
-    return { folder, skipped, senders: [...senders.values()].sort((a, b) =>
+    return { folder, total, unread, skipped, senders: [...senders.values()].sort((a, b) =>
       b.ids.length - a.ids.length || a.email.localeCompare(b.email)) };
   }
 
@@ -54,7 +72,7 @@ var Sweeper = (() => {
     const groups = new Map();
     for (const sender of senders) {
       if (!sender.ids.length) continue;
-      const email = `*@${sender.email.split("@")[1]}`;
+      const email = `*@${sender.email.slice(sender.email.lastIndexOf("@") + 1)}`;
       if (!groups.has(email)) groups.set(email, {
         email, byDomain: true, ids: [], recentCount: 0, unreadIds: new Set(), recentUnreadIds: new Set(), members: []
       });
