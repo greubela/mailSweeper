@@ -63,6 +63,16 @@ a missing background.js. These issues are corrected.
 
 ## Validation
 
+The source stays in three JavaScript files:
+
+- `sweeper.js`: named helpers for folder pagination, sender parsing, counts, grouping,
+  and message actions. Its public API remains `scan`, `groupSenders`, `visibleSenders`,
+  `act`, and `emailAddress`.
+- `popup.js`: named handlers for scans, filter changes, and actions, plus helpers for
+  table rendering and status messages.
+- `experiments/spamFilter/api.js`: helpers for validating conditions, building the
+  native filter, and saving it with rollback on failure.
+
 The only test setup is Node's built-in test runner; no packages need installing.
 Run `node --test tests/sweeper.test.cjs` for mocked API regression tests, including
 pagination, address/domain grouping, action order, failure handling, filter OR conditions,
